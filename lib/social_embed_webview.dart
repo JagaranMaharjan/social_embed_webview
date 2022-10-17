@@ -1,7 +1,6 @@
 library social_embed_webview;
 
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:social_embed_webview/utils/common-utils.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -26,13 +25,42 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
   double _height = 300;
   late final WebViewController wbController;
   late String htmlBody;
-  late ValueNotifier<bool> _isLoadingContent = ValueNotifier(true);
+  ValueNotifier<bool> _isLoadingContent = ValueNotifier(true);
+  late WebView webView;
+  double? aspectRatio;
 
   @override
   void initState() {
     super.initState();
     if (widget.socialMediaObj.supportMediaController)
       WidgetsBinding.instance.addObserver(this);
+    webView = WebView(
+        initialUrl: htmlToURI(getHtmlBody()),
+        javascriptChannels:
+            <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
+        javascriptMode: JavascriptMode.unrestricted,
+        initialMediaPlaybackPolicy:
+            AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
+        onWebViewCreated: (wbc) {
+          wbController = wbc;
+        },
+        onPageFinished: (str) {
+          final color = colorToHtmlRGBA(getBackgroundColor(context));
+          wbController
+              .runJavascript('document.body.style= "background-color: $color"');
+          if (widget.socialMediaObj.aspectRatio == null)
+            wbController.runJavascript('setTimeout(() => sendHeight(), 0)');
+          _isLoadingContent.value = false;
+        },
+        navigationDelegate: (navigation) async {
+          final url = navigation.url;
+          if (navigation.isForMainFrame && await canLaunchUrlString(url)) {
+            launchUrlString(url, mode: LaunchMode.externalApplication);
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        });
+    aspectRatio = widget.socialMediaObj.aspectRatio;
   }
 
   @override
@@ -59,34 +87,7 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final wv = WebView(
-        initialUrl: htmlToURI(getHtmlBody()),
-        javascriptChannels:
-            <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
-        javascriptMode: JavascriptMode.unrestricted,
-        initialMediaPlaybackPolicy:
-            AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
-        onWebViewCreated: (wbc) {
-          wbController = wbc;
-        },
-        onPageFinished: (str) {
-          final color = colorToHtmlRGBA(getBackgroundColor(context));
-          wbController
-              .runJavascript('document.body.style= "background-color: $color"');
-          if (widget.socialMediaObj.aspectRatio == null)
-            wbController.runJavascript('setTimeout(() => sendHeight(), 0)');
-          _isLoadingContent.value = false;
-        },
-        navigationDelegate: (navigation) async {
-          final url = navigation.url;
-          if (navigation.isForMainFrame && await canLaunchUrlString(url)) {
-            launchUrlString(url, mode: LaunchMode.externalApplication);
-            return NavigationDecision.prevent;
-          }
-          return NavigationDecision.navigate;
-        });
-    final ar = widget.socialMediaObj.aspectRatio;
-    return (ar != null)
+    return (aspectRatio != null)
         ? Stack(
             children: [
               ValueListenableBuilder<bool>(
@@ -97,7 +98,7 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
                             Center(
                               child: CircularProgressIndicator(),
                             ))
-                        : AspectRatio(aspectRatio: ar, child: wv);
+                        : AspectRatio(aspectRatio: aspectRatio!, child: webView);
                   }),
             ],
           )
@@ -114,7 +115,7 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
                                   child: CircularProgressIndicator(),
                                 ),
                           )
-                        : SizedBox(height: _height, child: wv);
+                        : SizedBox(height: _height, child: webView);
                   }),
             ],
           );
