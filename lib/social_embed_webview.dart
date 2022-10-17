@@ -26,7 +26,6 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
   late final WebViewController wbController;
   late String htmlBody;
   ValueNotifier<bool> _isLoadingContent = ValueNotifier(true);
-  late WebView webView;
   double? aspectRatio;
 
   @override
@@ -34,32 +33,6 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
     super.initState();
     if (widget.socialMediaObj.supportMediaController)
       WidgetsBinding.instance.addObserver(this);
-    webView = WebView(
-        initialUrl: htmlToURI(getHtmlBody()),
-        javascriptChannels:
-            <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
-        javascriptMode: JavascriptMode.unrestricted,
-        initialMediaPlaybackPolicy:
-            AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
-        onWebViewCreated: (wbc) {
-          wbController = wbc;
-        },
-        onPageFinished: (str) {
-          final color = colorToHtmlRGBA(getBackgroundColor(context));
-          wbController
-              .runJavascript('document.body.style= "background-color: $color"');
-          if (widget.socialMediaObj.aspectRatio == null)
-            wbController.runJavascript('setTimeout(() => sendHeight(), 0)');
-          _isLoadingContent.value = false;
-        },
-        navigationDelegate: (navigation) async {
-          final url = navigation.url;
-          if (navigation.isForMainFrame && await canLaunchUrlString(url)) {
-            launchUrlString(url, mode: LaunchMode.externalApplication);
-            return NavigationDecision.prevent;
-          }
-          return NavigationDecision.navigate;
-        });
     aspectRatio = widget.socialMediaObj.aspectRatio;
   }
 
@@ -87,38 +60,79 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return (aspectRatio != null)
-        ? Stack(
-            children: [
-              ValueListenableBuilder<bool>(
-                  valueListenable: _isLoadingContent,
-                  builder: (_, isContentLoading, child) {
-                    return isContentLoading
-                        ? (widget.loadingWidget ??
-                            Center(
-                              child: CircularProgressIndicator(),
-                            ))
-                        : AspectRatio(aspectRatio: aspectRatio!, child: webView);
-                  }),
-            ],
-          )
-        : Stack(
-            children: [
-              ValueListenableBuilder<bool>(
-                  valueListenable: _isLoadingContent,
-                  builder: (_, isContentLoading, child) {
-                    return isContentLoading
-                        ? SizedBox(
-                            height: _height,
-                            child: widget.loadingWidget ??
-                                Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                          )
-                        : SizedBox(height: _height, child: webView);
-                  }),
-            ],
-          );
+    final webView  = WebView(
+        initialUrl: htmlToURI(getHtmlBody()),
+        javascriptChannels:
+        <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
+        javascriptMode: JavascriptMode.unrestricted,
+        initialMediaPlaybackPolicy:
+        AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
+        onWebViewCreated: (wbc) {
+          wbController = wbc;
+        },
+        onPageFinished: (str) {
+          final color = colorToHtmlRGBA(getBackgroundColor(context));
+          wbController
+              .runJavascript('document.body.style= "background-color: $color"');
+          if (widget.socialMediaObj.aspectRatio == null)
+            wbController.runJavascript('setTimeout(() => sendHeight(), 0)');
+          _isLoadingContent.value = false;
+        },
+        navigationDelegate: (navigation) async {
+          final url = navigation.url;
+          if (navigation.isForMainFrame && await canLaunchUrlString(url)) {
+            launchUrlString(url, mode: LaunchMode.externalApplication);
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        });
+    return ValueListenableBuilder<bool>(
+        valueListenable: _isLoadingContent,
+        builder: (_, isContentLoading, child) {
+          return isContentLoading
+              ? (widget.loadingWidget ??
+                  Center(
+                    child: CircularProgressIndicator(),
+                  ))
+              : (aspectRatio != null)
+                  ? AspectRatio(aspectRatio: aspectRatio!, child: webView)
+                  : SizedBox(
+                      height: _height,
+                      child: SizedBox(height: _height, child: webView),
+                    );
+        });
+    // return (aspectRatio != null)
+    //     ? Stack(
+    //         children: [
+    //           ValueListenableBuilder<bool>(
+    //               valueListenable: _isLoadingContent,
+    //               builder: (_, isContentLoading, child) {
+    //                 return isContentLoading
+    //                     ? (widget.loadingWidget ??
+    //                         Center(
+    //                           child: CircularProgressIndicator(),
+    //                         ))
+    //                     : AspectRatio(aspectRatio: aspectRatio!, child: webView);
+    //               }),
+    //         ],
+    //       )
+    //     : Stack(
+    //         children: [
+    //           ValueListenableBuilder<bool>(
+    //               valueListenable: _isLoadingContent,
+    //               builder: (_, isContentLoading, child) {
+    //                 return isContentLoading
+    //                     ? SizedBox(
+    //                         height: _height,
+    //                         child: widget.loadingWidget ??
+    //                             Center(
+    //                               child: CircularProgressIndicator(),
+    //                             ),
+    //                       )
+    //                     : SizedBox(height: _height, child: webView);
+    //               }),
+    //         ],
+    //       );
   }
 
   JavascriptChannel _getHeightJavascriptChannel() {
