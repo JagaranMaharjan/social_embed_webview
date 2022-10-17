@@ -26,7 +26,7 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
   double _height = 300;
   late final WebViewController wbController;
   late String htmlBody;
-  bool showProgressIndicator = true;
+  late ValueNotifier<bool> _isLoadingContent = ValueNotifier(true);
 
   @override
   void initState() {
@@ -64,10 +64,8 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
         javascriptChannels:
             <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
         javascriptMode: JavascriptMode.unrestricted,
-        initialMediaPlaybackPolicy: AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
-        onPageStarted: (v){
-          setState(() => showProgressIndicator = true);
-        },
+        initialMediaPlaybackPolicy:
+            AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
         onWebViewCreated: (wbc) {
           wbController = wbc;
         },
@@ -77,7 +75,7 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
               .runJavascript('document.body.style= "background-color: $color"');
           if (widget.socialMediaObj.aspectRatio == null)
             wbController.runJavascript('setTimeout(() => sendHeight(), 0)');
-          setState(() => showProgressIndicator = false);
+          _isLoadingContent.value = false;
         },
         navigationDelegate: (navigation) async {
           final url = navigation.url;
@@ -91,35 +89,33 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
     return (ar != null)
         ? Stack(
             children: [
-              AspectRatio(aspectRatio: ar, child: wv),
-              AnimatedOpacity(
-                opacity: showProgressIndicator ? 1 : 0,
-                duration: const Duration(milliseconds: 300),
-                child: widget.loadingWidget ??
-                    Center(
-                      child: CircularProgressIndicator(),
-                    ),
-              ),
+              ValueListenableBuilder<bool>(
+                  valueListenable: _isLoadingContent,
+                  builder: (_, isContentLoading, child) {
+                    return isContentLoading
+                        ? (widget.loadingWidget ??
+                            Center(
+                              child: CircularProgressIndicator(),
+                            ))
+                        : AspectRatio(aspectRatio: ar, child: wv);
+                  }),
             ],
           )
         : Stack(
             children: [
-              AnimatedOpacity(
-                opacity: showProgressIndicator ? 0 : 1,
-                duration: const Duration(milliseconds: 300),
-                child: SizedBox(height: _height, child: wv),
-              ),
-              AnimatedOpacity(
-                opacity: showProgressIndicator ? 1 : 0,
-                duration: const Duration(milliseconds: 300),
-                child: SizedBox(
-                  height: _height,
-                  child: widget.loadingWidget ??
-                      Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                ),
-              ),
+              ValueListenableBuilder<bool>(
+                  valueListenable: _isLoadingContent,
+                  builder: (_, isContentLoading, child) {
+                    return isContentLoading
+                        ? SizedBox(
+                            height: _height,
+                            child: widget.loadingWidget ??
+                                Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                          )
+                        : SizedBox(height: _height, child: wv);
+                  }),
             ],
           );
   }
