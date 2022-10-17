@@ -64,7 +64,10 @@ class _SocialEmbedState extends State<SocialEmbed> with WidgetsBindingObserver {
         javascriptChannels:
             <JavascriptChannel>[_getHeightJavascriptChannel()].toSet(),
         javascriptMode: JavascriptMode.unrestricted,
-        initialMediaPlaybackPolicy: AutoMediaPlaybackPolicy.always_allow,
+        initialMediaPlaybackPolicy: AutoMediaPlaybackPolicy.require_user_action_for_all_media_types,
+        onPageStarted: (v){
+          setState(() => showProgressIndicator = true);
+        },
         onWebViewCreated: (wbc) {
           wbController = wbc;
         },
